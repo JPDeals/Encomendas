@@ -1,0 +1,47 @@
+<!DOCTYPE html><html lang="pt-PT"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>JPDeals — Encomenda</title>
+<style>:root{--bg:#fff;--fg:#1b1b1b;--mu:#666;--bd:#d8d0d6;--ac:#C08810;--pu:#684060;color-scheme:light dark}
+@media(prefers-color-scheme:dark){:root{--bg:#14101a;--fg:#eee;--mu:#aaa;--bd:#3b3144}}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.4 system-ui,sans-serif;padding:16px;max-width:620px;margin:auto}
+h1{color:var(--ac);font-size:1.4rem}h2{color:var(--pu);font-size:1.05rem;margin:22px 0 6px}
+input,select,textarea{width:100%;box-sizing:border-box;padding:10px;margin:4px 0;border:1px solid var(--bd);border-radius:8px;background:transparent;color:inherit;font:inherit}
+.l{border:1px solid var(--bd);border-radius:10px;padding:8px;margin:8px 0}.d{color:var(--mu);font-size:.9rem;min-height:1.2em}
+.r{display:flex;gap:8px}.r>*{flex:1}button{padding:12px;border:0;border-radius:8px;background:var(--ac);color:#fff;font:inherit;font-weight:600;width:100%;margin:8px 0}
+button.s{background:transparent;border:1px solid var(--bd);color:inherit}.e{color:#c0392b;margin:8px 0}.hp{position:absolute;left:-9999px}</style></head><body>
+<h1>Encomenda JPDeals</h1><p class="d">Indique o código de cada artigo (consta no anúncio).</p>
+<div id="f"><h2>Artigos</h2><div id="ls"></div><button class="s" id="add" type="button">+ Adicionar artigo</button>
+<h2>Entrega</h2><input id="nome" placeholder="Nome completo" autocomplete="name"><input id="email" type="email" placeholder="Email" autocomplete="email"><input id="telefone" type="tel" placeholder="Telefone" autocomplete="tel">
+<input id="morada" placeholder="Morada" autocomplete="street-address"><div class="r"><input id="cp" placeholder="Cód. postal 0000-000" autocomplete="postal-code"><input id="localidade" placeholder="Localidade"></div>
+<input id="pais" value="Portugal"><input id="nif" inputmode="numeric" placeholder="NIF para fatura (opcional)"><textarea id="notas" rows="2" placeholder="Notas (opcional)"></textarea>
+<input class="hp" id="website" tabindex="-1" autocomplete="off"><label><input type="checkbox" id="ok" style="width:auto"> Aceito que os meus dados sejam usados para processar e entregar esta encomenda.</label>
+<div class="e" id="er"></div><button id="go" type="button">Finalizar encomenda</button></div>
+<div id="fim" hidden><h2>Encomenda registada</h2><p>Código: <b id="cod"></b></p><p id="tot"></p>
+<div id="mb" hidden><h2>Pagamento por MB WAY</h2><p id="mbt"></p><button id="cpn" class="s" type="button">Copiar número</button></div>
+<p class="d" id="msg">Enviámos um email de confirmação.</p>
+<button id="cp2" class="s" type="button">Copiar código</button><button id="paid" type="button" hidden>Já paguei</button>
+<a id="wa" hidden target="_blank"><button class="s" type="button">Enviar comprovativo por WhatsApp</button></a><button id="pg" type="button" hidden>Ir para o pagamento</button></div>
+<script>
+var EXEC_URL='COLOCAR_URL_EXEC_AQUI',MAX=20,$=function(i){return document.getElementById(i)};
+function api(fn,arg){return new Promise(function(ok,ko){if(window.google&&google.script&&google.script.run){google.script.run.withSuccessHandler(ok).withFailureHandler(ko)[fn](arg)}
+else{fetch(EXEC_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({fn:fn,arg:arg})}).then(function(r){return r.json()}).then(ok,ko)}})}
+function linha(){var d=document.createElement('div');d.className='l';d.innerHTML='<div class="r"><input class="c" placeholder="Código do artigo" autocapitalize="characters"><input class="q" type="number" min="1" value="1" style="max-width:90px"></div><div class="d"></div>';
+var c=d.querySelector('.c'),i=d.querySelector('.d');c.addEventListener('change',function(){c.value=c.value.toUpperCase().trim();if(!c.value){i.textContent='';return}i.textContent='…';
+api('getArtigo',c.value).then(function(r){i.textContent=r.ok?r.descricao+(r.preco!=null?' — '+r.preco.toFixed(2).replace('.',',')+' €':''):r.erro},function(){i.textContent='Erro de ligação.'})});$('ls').appendChild(d)}
+linha();$('add').onclick=function(){if($('ls').children.length<MAX)linha()};
+api('getConfig').then(function(c){MAX=c.maxLinhas;window.PAGAR=c.urlPagar});
+$('go').onclick=function(){var L=[].map.call($('ls').children,function(d){return{codigo:d.querySelector('.c').value,qtd:+d.querySelector('.q').value}}).filter(function(x){return x.codigo});
+var d={linhas:L,consentimento:$('ok').checked,website:$('website').value};['nome','email','telefone','morada','cp','localidade','pais','nif','notas'].forEach(function(k){d[k]=$(k).value});
+$('er').textContent='';$('go').disabled=true;api('criarEncomenda',d).then(function(r){$('go').disabled=false;if(!r.ok){$('er').textContent=r.erro;return}
+$('f').hidden=true;$('fim').hidden=false;$('cod').textContent=r.codigo;$('tot').textContent='Total: '+(r.total==null?'a confirmar':r.total.toFixed(2).replace('.',',')+' €');window.PAGAR=r.urlPagar;window.R=r;mostrarPag(r)},
+function(){$('go').disabled=false;$('er').textContent='Erro de ligação. Tente de novo.'})};
+function fmt(n){return n.toFixed(2).replace('.',',')+' €'}
+function cop(t,b){(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(function(){b.textContent='Copiado'},function(){prompt('Copie:',t)})}
+function mostrarPag(r){if(r.mbway&&r.total!=null){$('mb').hidden=false;$('mbt').textContent='Envie '+fmt(r.total)+' por MB WAY (Enviar dinheiro) para '+r.mbway+'. Na descrição escreva '+r.codigo+'.';$('paid').hidden=false}
+else if(r.mbway){$('msg').textContent='Enviámos um email de confirmação. O valor total será confirmado por nós antes do pagamento.'}
+else{$('pg').hidden=false}}
+$('pg').onclick=function(){window.open(window.PAGAR,'_blank')};
+$('cp2').onclick=function(){cop($('cod').textContent,$('cp2'))};
+$('cpn').onclick=function(){cop(window.R.mbway,$('cpn'))};
+$('paid').onclick=function(){$('paid').disabled=true;api('declararPagamento',{codigo:window.R.codigo,email:$('email').value}).then(function(x){
+$('msg').textContent=x.ok?'Obrigado. Enviaremos a confirmação quando validarmos o pagamento.':x.erro;if(x.ok){$('paid').hidden=true;if(window.R.whatsapp){$('wa').href='https://wa.me/'+window.R.whatsapp+'?text='+encodeURIComponent('Comprovativo da encomenda '+window.R.codigo);$('wa').hidden=false}}else $('paid').disabled=false},
+function(){$('paid').disabled=false;$('msg').textContent='Erro de ligação. Tente de novo.'})};
+</script></body></html>
